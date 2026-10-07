@@ -5,21 +5,48 @@ import world
 
 pg.init()
 
+# Window, font, and world
 width = config.CELL_SIZE * config.COLUMNS
 height = config.CELL_SIZE * config.ROWS
 screen = pg.display.set_mode(size=(width, height))
 font = render.create_font()
 state = world.create_world()
 
+# Loop state
 clock = pg.time.Clock()
-isRunning = True
+running = True
 paused = False
 
-while isRunning:
-    pg.event.get() #gets user input etc.
+# Fixed-rate ticking
+tick_interval = 1000 / config.TICKS_PER_SEC   # milliseconds per tick
+time_bank = 0
+
+while running:
+    # 1. Handle events
+    for event in pg.event.get():
+        if event.type == pg.QUIT:
+            running = False
+        if event.type == pg.KEYDOWN:
+            if event.key == pg.K_SPACE:
+                paused = not(paused)
+
+            elif (event.key == pg.K_RIGHT) and paused:
+                state = world.tick(state)
+
+    # 2. Spend banked time on ticks
+    if not paused:
+        while time_bank >= tick_interval:
+            state = world.tick(state)
+            time_bank -= tick_interval
+
+    # 3. Draw the frame
     screen.fill((0, 0, 0))
     render.draw(screen, state, font)
-    pg.display.flip() #shows the render on screen
-    clock.tick(config.FPS) #a slight wait function for steady FPS   
+    pg.display.flip()
+
+    # 4. Wait to hold the frame rate, and bank the elapsed time
+    dt = clock.tick(config.FPS)
+    if not paused:
+        time_bank += dt
 
 pg.quit()
