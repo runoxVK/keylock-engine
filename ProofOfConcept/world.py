@@ -5,6 +5,7 @@ import type_table as tt
 #East, West, North, South (Think of like unit vectors)
 NEIGHBOR_STEPS = ((1,0), (-1,0), (0,1), (0,-1))
 
+NO_OWNER = -1
 
 #Create World function
 #A world holds a cell grid per type, each type gets their own world grid for that type
@@ -12,27 +13,34 @@ def create_world(num_types=tt.NUM_TYPES, rows=config.ROWS , columns=config.COLUM
 
     #This function will create a matrix of all zeros
     #free represents the free amounts of each type at each cell
+    #Ex. free[q, j, i] = how much free type q is at row j, column i
     free = np.zeros((num_types, rows, columns), dtype=float)
     free[0] = 1 #setting the ambient to one
 
-    #Ex. free[q, j, i] = how much free type q is at row j, column i
-    return free
+    bundled = np.zeros(free.shape) #analogous to the free array but now bundled
+    owner = np.full((rows, columns), NO_OWNER, dtype=int) #which bundle owns every cell
 
-def binding(free, q):
-    types, rows, columns = free.shape
+    
+    return {"free": free, "bundled": bundled, "owner": owner}
+
+def binding(world, q):
+
+    total = world["free"] + world["bundled"]
+    types, rows, columns = total.shape
     E = np.zeros((rows, columns)) #the binding of type q at every cell of the grid
 
     for r in range(0, types, 1):
-        E += free[r] * tt.FIT[q,r] #definiton of binding (free amount of type r * the fit that q's key fits into r's lock)
+        E += total[r] * tt.FIT[q,r] #definiton of binding (amount of type r * the fit that q's key fits into r's lock)
 
     return E
 
-def flow(free):
+def flow(world):
+    free = world["free"]
     new = free.copy()
     types, rows, columns = free.shape
 
     for q in range (1, types, 1):#iterates through every types grid one at a time (we start at 1 to skip the ambient)
-        E = binding(free, q)
+        E = binding(world, q)
         shares = (config.HOP_RATE/4)*free[q]*np.exp(-config.BINDING_SENSITIVITY * E) #multiply every cell in each types grid by the share rate and function of E
 
         #This loop now iterates through each individual cell of each type's grid
@@ -48,7 +56,8 @@ def flow(free):
                     if (ni >= 0 and ni< columns) and (nj >= 0 and nj < rows):
                         new[q, j, i] -= shares[j, i]      # this cell sends its share to the neighbor
                         new[q, j, i] += shares[nj, ni]    # and receives the neighbor's share
-    return new
+
+    return {"free": new, "bundled": world["bundled"], "owner": world["owner"]}
 
 #reaction function is very dense - come back here to check
 def reactions(free):
