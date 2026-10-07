@@ -28,6 +28,16 @@ def create_world(num_types=tt.NUM_TYPES, rows=config.ROWS , columns=config.COLUM
     
     return {"free": free, "bundled": bundled, "owner": owner}
 
+def add_bundle(world, label, cells, q, amount):
+    # give each listed cell to bundle `label`,
+    # put `amount` of type q into it as bundled material.
+
+    #cells input represent coordinate points (i,j) and the input will take a list of whatever cell coordinates you want the bundle to occupy
+    for i,j in cells:
+        world["owner"][j,i] = label #this bundle now owns the cell
+        world["bundled"][q, j, i] += amount #add the bundle's material there   
+            
+
 def binding(world, q):
 
     total = world["free"] + world["bundled"]
