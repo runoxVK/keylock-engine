@@ -48,9 +48,9 @@ for q in range(0, NUM_TYPES, 1):
         FIT[q,r] = max(0, AFFINITY[q,r]- config.DEAD_ZONE)
         CLASH[q,r] = max(0, -AFFINITY[q,r] - config.DEAD_ZONE)
 
-#Checks to make sure all valeus are valid 
+#Checks to make sure all valeus are valid: 
 
-# Every key and lock has exactly DIM numbers, and there is one per type.
+#Every key and lock has exactly DIM numbers, and there is one per type.
 assert KEYS.shape == (NUM_TYPES, config.DIM), "KEYS must have one row of DIM numbers per type"
 assert LOCKS.shape == (NUM_TYPES, config.DIM), "LOCKS must have one row of DIM numbers per type"
 

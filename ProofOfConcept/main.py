@@ -15,7 +15,6 @@ font = render.create_font()
 state = world.create_world()
 state[1, config.ROWS//2, config.COLUMNS//2] = 100 #puts 100 units of type 1 onto the middle cell
 
-# Loop state
 clock = pg.time.Clock()
 running = True
 paused = False
