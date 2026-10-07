@@ -13,7 +13,7 @@ screen = pg.display.set_mode(size=(width, height))
 font = render.create_font()
 
 state = world.create_world()
-state[config.DISPLAY_TYPE, config.ROWS//2, config.COLUMNS//2] = 100 #puts 100 units of type 1 onto the middle cell
+state[1, config.ROWS//2, config.COLUMNS//2] = 100 #puts 100 units of type 1 onto the middle cell
 
 # Loop state
 clock = pg.time.Clock()
