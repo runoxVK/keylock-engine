@@ -18,13 +18,22 @@ def create_world(num_types=tt.NUM_TYPES, rows=config.ROWS , columns=config.COLUM
     #Ex. free[q, j, i] = how much free type q is at row j, column i
     return free
 
+def binding(free, q):
+    types, rows, columns = free.shape
+    E = np.zeros((rows, columns)) #the binding of type q at every cell of the grid
+
+    for r in range(0, types, 1):
+        E += free[r] * tt.FIT[q,r] #definiton of binding (free amount of type r * the fit that q's key fits into r's lock)
+
+    return E
 
 def flow(free):
     new = free.copy()
     types, rows, columns = free.shape
 
     for q in range (1, types, 1):#iterates through every types grid one at a time (we start at 1 to skip the ambient)
-        shares = (config.HOP_RATE/4)*free[q] #multiply every cell in each types grid by the share rate
+        E = binding(free, q)
+        shares = (config.HOP_RATE/4)*free[q]*np.exp(-config.BINDING_SENSITIVITY * E) #multiply every cell in each types grid by the share rate and function of E
 
         #This loop now iterates through each individual cell of each type's grid
         for j in range (0, rows, 1):
