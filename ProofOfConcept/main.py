@@ -11,7 +11,9 @@ width = config.CELL_SIZE * config.COLUMNS
 height = config.CELL_SIZE * config.ROWS
 screen = pg.display.set_mode(size=(width, height))
 font = render.create_font()
+
 state = world.create_world()
+state[config.DISPLAY_TYPE, config.ROWS//2, config.COLUMNS//2] = 100 #puts 100 units of type 1 onto the middle cell
 
 # Loop state
 clock = pg.time.Clock()
@@ -42,7 +44,7 @@ while running:
 
     # 3. Draw the frame
     screen.fill((0, 0, 0))
-    render.draw(screen, state, font)
+    render.draw(screen, state[config.DISPLAY_TYPE], font)
     pg.display.flip()
 
     # 4. Wait to hold the frame rate, and bank the elapsed time
