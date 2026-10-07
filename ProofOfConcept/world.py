@@ -7,6 +7,11 @@ NEIGHBOR_STEPS = ((1,0), (-1,0), (0,1), (0,-1))
 
 NO_OWNER = -1
 
+FREE = 0 #index for free amounts
+BUNDLED = 1
+
+ALLOWED_KINDS = ((FREE, FREE), (FREE, BUNDLED), (BUNDLED, FREE))
+
 #Create World function
 #A world holds a cell grid per type, each type gets their own world grid for that type
 def create_world(num_types=tt.NUM_TYPES, rows=config.ROWS , columns=config.COLUMNS):
@@ -60,23 +65,30 @@ def flow(world):
     return {"free": new, "bundled": world["bundled"], "owner": world["owner"]}
 
 #reaction function is very dense - come back here to check
-def reactions(free):
-    # Reactions between free amounts (Part IV, form R1).
+def reactions(world):
+
+    #stacks free amounts and bundled amounts on top of eachother in a new dimension such that index zero will refer to the free array and index 1 refers to the bundled array
+    amounts = np.stack((world["free"], world["bundled"]))
+
+    #Reactions between free amounts (Part IV, form R1).
     #every amount used in a calculation comes from free
-    new = free.copy()
-    types, rows, columns = free.shape
+    new = amounts.copy()
+    kinds, types, rows, columns = amounts.shape
 
-    #raw[q, r] is a 2D grid: how much type q (the key side) would react with type r
-    raw = np.zeros((types, types, rows, columns))
+    #Before introducing bundles: raw[q, r] is a 2D grid: how much type q (key side) would react with type r
+    #After bundles: Then raw[k1, q, k2, r] is the grid for the pair "type q of kind k1, with type r of kind k2.
+    raw = np.zeros((kinds, types, kinds, types, rows, columns))
 
-    #go through every ordered pair (q, r). Both loops start at 0 so the ambient is included:
-    for q in range (0, types, 1):
-        for r in range (0, types, 1):
-            if q != r:   # a free type never reacts with itself (Remark IV.3)
-                #definition of raw amount product
-                #pairs that neither fit nor clash get 0 and don't react.
-                raw[q,r] = config.REACTION_RATE * free[q] * free[r] * (tt.FIT[q,r] + tt.CLASH[q,r]) #definition of raw reaction amount
-                #represnts the raw reaction amount for every cell given a pair of types
+    #for every allowed pair in allowe kinds (split into both specific kinds)
+    for k1, k2 in ALLOWED_KINDS: 
+        #go through every ordered pair of type (q, r). Both loops start at 0 so the ambient is included:
+        for q in range (0, types, 1):
+            for r in range (0, types, 1):
+                if not (k1 == FREE and k2 == FREE and q == r): # a free type never reacts with itself (Remark IV.3)
+                    #definition of raw amount product
+                    #pairs that neither fit nor clash get 0 and don't react.
+                    raw[k1,q,k2,r] = config.REACTION_RATE * amounts[k1,q] * amounts[k2,r] * (tt.FIT[q,r] + tt.CLASH[q,r]) #definition of raw reaction amount
+                    #represnts the raw reaction amount for every cell given a pair of types
 
     # demand[t] is a grid: in each cell, the total amount that all pairs together want to take from type t
     demand = np.zeros((types, rows, columns))
