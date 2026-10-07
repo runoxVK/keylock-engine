@@ -2,6 +2,7 @@ import pygame as pg
 import config
 import render
 import world
+import type_table as tt
 
 pg.init()
 

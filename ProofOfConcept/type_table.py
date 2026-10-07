@@ -3,6 +3,7 @@ import config
 
 NAMES = ["ambient", "e", "s", "g"]
 NONE = -1   # marks "no product"
+NUM_TYPES = len(NAMES)
 
 # Keys: one row per type, in the same order as NAMES.
 KEYS = np.array([
@@ -35,3 +36,10 @@ VALENCES = np.array([
     0,      # s
     1,      # g - pulls toward cells containing what its lock fits
 ], dtype=int)
+
+AFFINITY = np.zeros((NUM_TYPES, NUM_TYPES))
+
+for q in range(0, NUM_TYPES, 1):
+    for r in range(0, NUM_TYPES, 1):
+        AFFINITY[q,r] = np.dot(KEYS[q],LOCKS[r])
+
