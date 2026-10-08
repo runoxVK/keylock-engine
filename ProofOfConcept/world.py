@@ -158,6 +158,7 @@ def reactions(world):
     
     return {"free": new[FREE], "bundled": new[BUNDLED], "owner": world["owner"]}
 
+#releases cells from a bundle if the local bond is weak enough
 def release(world):
     bundled = world["bundled"]
     types, rows, columns = bundled.shape
@@ -199,6 +200,19 @@ def release(world):
                             new_free[t,j,i] += bundled[t,j,i]
                             new_bundled[t,j,i] = 0
     return {"free": new_free, "bundled": new_bundled, "owner": owner}
+
+#removes cells from a bundle if a cell has no type in it
+def cleanup(world):
+    bundled = world["bundled"]
+    new_owner = world["owner"].copy()
+    rows, columns = snew_owner.shape
+
+    #loop over every cell
+    for j in range (0, rows, 1):
+        for i in range (0, columns, 1):
+            #check if its owned
+            if (new_owner[j,i] != NO_OWNER):
+
 
                       
 
