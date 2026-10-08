@@ -181,24 +181,28 @@ def release(world):
                        #local bond (Definition 7): add up how well t fits, or is fitted by, each type u in this bundle here
                         for u in range(0, types, 1):
                             H += bundled[u,j,i]*(tt.FIT[t,u]+tt.FIT[u,t])
-
                         #neighbor check
                         for di, dj in NEIGHBOR_STEPS:
                             ni = i + di
                             nj = j + dj
-
                             #Only continue if that neighbor actually exists on the grid
                             if (ni >= 0 and ni< columns) and (nj >= 0 and nj < rows):
                                 if (owner[nj,ni] == bundle_owner):
-
                                     #same as above but this time it is adding to the local bond by comparing to neighboring cells of the same bundle
                                     for u in range(0, types, 1):
                                         H += bundled[u,nj,ni]*(tt.FIT[t,u]+tt.FIT[u,t])
 
+                        #now that H has been added up, we need to now use the Hold value to see if anything releases
+
+                        if H == 0:
+                            #if the hold is zero, release the bundled amount from the bundle turning it into a free amount
+                            new_free[t,j,i] += bundled[t,j,i]
+                            new_bundled[t,j,i] = 0
+    return {"free": new_free, "bundled": new_bundled, "owner": owner}
 
                       
 
 
 def tick(world):
-    return reactions(flow(world))
+    return release(reactions(flow(world)))
 
