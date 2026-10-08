@@ -170,12 +170,32 @@ def release(world):
         for i in range (0, columns, 1):  
             #check if the cell is owned by a bundle
             if owner[j,i] != NO_OWNER:
-                bundle = owner[j,i] #set bundle to the bundle name
-                
-                 #iterate through all the types to check hich ones are bundles
+                bundle_owner = owner[j,i] #set bundle to the bundle name
+
+                #for each type t bundled in this cell (start at 1: the ambient is never bundled)
                 for t in range (1, types, 1):
-                    if bundled[t,j,i] > 0:
-                        pass
+                    if bundled[t,j,i] > 0: #checks if there is more than zero of that type in the bundle
+                        #local bond of type t at this cell
+                        H = 0
+          
+                       #local bond (Definition 7): add up how well t fits, or is fitted by, each type u in this bundle here
+                        for u in range(0, types, 1):
+                            H += bundled[u,j,i]*(tt.FIT[t,u]+tt.FIT[u,t])
+
+                        #neighbor check
+                        for di, dj in NEIGHBOR_STEPS:
+                            ni = i + di
+                            nj = j + dj
+
+                            #Only continue if that neighbor actually exists on the grid
+                            if (ni >= 0 and ni< columns) and (nj >= 0 and nj < rows):
+                                if (owner[nj,ni] == bundle_owner):
+
+                                    #same as above but this time it is adding to the local bond by comparing to neighboring cells of the same bundle
+                                    for u in range(0, types, 1):
+                                        H += bundled[u,nj,ni]*(tt.FIT[t,u]+tt.FIT[u,t])
+
+
                       
 
 
