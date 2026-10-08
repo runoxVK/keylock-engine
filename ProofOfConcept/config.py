@@ -17,3 +17,5 @@ DISPLAY_TYPE = 2 #index of type that the window shows (1 = e)
 BINDING_SENSITIVITY = 1
 
 REACTION_RATE = 0.1
+
+BOND_THRESHOLD = 0.5

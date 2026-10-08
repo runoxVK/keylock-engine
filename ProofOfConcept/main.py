@@ -13,7 +13,9 @@ screen = pg.display.set_mode(size=(width, height))
 font = render.create_font()
 
 state = world.create_world()
-state[1, config.ROWS//2, config.COLUMNS//2] = 100 #puts 100 units of type 1 onto the middle cell
+# Place bundle 0: one cell in the middle of the grid, holding 1 unit of type 1 (e).
+middle = (config.COLUMNS // 2, config.ROWS // 2)   # (column, row)
+world.add_bundle(state, 0, [middle], 1, 10.0)
 
 clock = pg.time.Clock()
 running = True
@@ -43,7 +45,8 @@ while running:
 
     # 3. Draw the frame
     screen.fill((0, 0, 0))
-    render.draw(screen, state[config.DISPLAY_TYPE], font)
+    total = state["free"][config.DISPLAY_TYPE] + state["bundled"][config.DISPLAY_TYPE]
+    render.draw(screen, total, font)
     pg.display.flip()
 
     # 4. Wait to hold the frame rate, and bank the elapsed time

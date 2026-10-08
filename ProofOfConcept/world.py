@@ -158,6 +158,26 @@ def reactions(world):
     
     return {"free": new[FREE], "bundled": new[BUNDLED], "owner": world["owner"]}
 
+def release(world):
+    bundled = world["bundled"]
+    types, rows, columns = bundled.shape
+    owner = world["owner"]
+    new_free = world["free"].copy()
+    new_bundled = world["bundled"].copy()
+
+    #go to every owned cell, and every type in it
+    for j in range (0, rows, 1):
+        for i in range (0, columns, 1):  
+            #check if the cell is owned by a bundle
+            if owner[j,i] != NO_OWNER:
+                bundle = owner[j,i] #set bundle to the bundle name
+                
+                 #iterate through all the types to check hich ones are bundles
+                for t in range (1, types, 1):
+                    if bundled[t,j,i] > 0:
+                        pass
+                      
+
 
 def tick(world):
     return reactions(flow(world))
