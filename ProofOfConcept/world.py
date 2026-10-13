@@ -205,18 +205,21 @@ def release(world):
 def cleanup(world):
     bundled = world["bundled"]
     new_owner = world["owner"].copy()
-    rows, columns = snew_owner.shape
+    rows, columns = new_owner.shape
 
     #loop over every cell
     for j in range (0, rows, 1):
         for i in range (0, columns, 1):
-            #check if its owned
-            if (new_owner[j,i] != NO_OWNER):
+            #check if its owned AND every bundled amount there is zero
+            if (new_owner[j,i] != NO_OWNER and np.all(bundled[:, j, i] == 0)):
+                new_owner[j,i] = NO_OWNER
+
+    return {"free":world["free"], "bundled":world["bundled"], "owner": new_owner}
 
 
                       
 
 
 def tick(world):
-    return release(reactions(flow(world)))
+    return cleanup(release(reactions(flow(world))))
 

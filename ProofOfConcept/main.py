@@ -15,7 +15,7 @@ font = render.create_font()
 state = world.create_world()
 # Place bundle 0: one cell in the middle of the grid, holding 1 unit of type 1 (e).
 middle = (config.COLUMNS // 2, config.ROWS // 2)   # (column, row)
-world.add_bundle(state, 0, [middle], 1, 10.0)
+world.add_bundle(state, 0, [middle], 1, 100.0)
 
 clock = pg.time.Clock()
 running = True
