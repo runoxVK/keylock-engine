@@ -14,25 +14,38 @@ screen = pg.display.set_mode(size=(width, height))
 font = render.create_font()
 
 
-#builds a world with one source of s in the middle and four seekers around it
+#builds the fire world: a wooden building with a stone east wall, an ice wall to the west, and a fire starting on the west wall
 def setup_world():
     state = world.create_world()
 
-    middle = (config.COLUMNS // 2, config.ROWS // 2) #(column, row)
+    #the building is a hollow rectangle from column 6 to 20 and row 4 to 15
+    #the east wall (column 20) is stone, every other wall is wood
+    wood_cells = []
+    stone_cells = []
+    for i in range(6, 21, 1):
+        for j in range(4, 16, 1):
+            if i == 20:
+                stone_cells.append((i, j))
+            elif i == 6 or j == 4 or j == 15:
+                wood_cells.append((i, j))
 
-    #bundle 0: the source, made of e
-    world.add_bundle(state, 0, [middle], 1, 10.0)
+    world.add_bundle(state, 0, wood_cells, tt.NAMES.index("wood"), 2.0) #bundle 0: all the wooden walls together
+    world.add_bundle(state, 1, stone_cells, tt.NAMES.index("stone"), 2.0) #bundle 1: the stone wall
 
-    #bundles 1 to 4: seekers made of g, scattered around the source
-    seeker_starts = [(5, 3), (34, 4), (8, 16), (31, 15)]
-    for k in range(0, len(seeker_starts), 1):
-        world.add_bundle(state, k + 1, [seeker_starts[k]], 3, 3.0)
+    #bundle 2: an ice wall a few cells west of the building
+    ice_cells = []
+    for j in range(2, 18, 1):
+        ice_cells.append((3, j))
+    world.add_bundle(state, 2, ice_cells, tt.NAMES.index("ice"), 2.0)
+
+    #start the fire: a burst of heat right next to the west wall
+    state["free"][tt.NAMES.index("heat"), 9, 5] += 20
 
     return state
 
 
 state = setup_world()
-display_type = config.DISPLAY_TYPE #0 shows everything, 1-3 show one type, can be changed with the number keys
+display_type = config.DISPLAY_TYPE #0 shows everything, 1-6 show one type, can be changed with the number keys
 tick_count = 0
 
 clock = pg.time.Clock()
@@ -48,6 +61,13 @@ while running:
     for event in pg.event.get():
         if event.type == pg.QUIT:
             running = False
+        #clicking a cell drops a burst of heat there, so you can start fires anywhere
+        if event.type == pg.MOUSEBUTTONDOWN:
+            mouse_x, mouse_y = event.pos
+            i = mouse_x // config.CELL_SIZE #column
+            j = config.ROWS - 1 - mouse_y // config.CELL_SIZE #row, flipped because screen y goes down but rows go north
+            state["free"][tt.NAMES.index("heat"), j, i] += 10
+
         if event.type == pg.KEYDOWN:
             if event.key == pg.K_SPACE:
                 paused = not(paused)
@@ -62,7 +82,7 @@ while running:
                 state = setup_world()
                 tick_count = 0
 
-            #number keys pick what is shown (0 = everything, 1 = e, 2 = s, 3 = g)
+            #number keys pick what is shown (0 = everything, 1 to 6 = one type, in the order of NAMES)
             elif pg.K_0 <= event.key <= pg.K_9:
                 chosen = event.key - pg.K_0
                 if chosen < tt.NUM_TYPES:
