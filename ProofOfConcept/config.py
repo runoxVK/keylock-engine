@@ -19,3 +19,5 @@ BINDING_SENSITIVITY = 1
 REACTION_RATE = 0.1
 
 BOND_THRESHOLD = 0.5
+
+SEED = 1 #seed for the random number generator, so every run with the same seed plays out the same

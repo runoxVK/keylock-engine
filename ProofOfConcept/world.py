@@ -12,6 +12,13 @@ BUNDLED = 1
 
 ALLOWED_KINDS = ((FREE, FREE), (FREE, BUNDLED), (BUNDLED, FREE))
 
+#the five displacements a bundle can choose from (Definition 9): stay, East, West, North, South
+DISPLACEMENTS = ((0,0), (1,0), (-1,0), (0,1), (0,-1))
+
+#random number generator for motion (random order of bundles and breaking ties)
+#seeded so the same seed gives the exact same run every time
+rng = np.random.default_rng(config.SEED)
+
 #Create World function
 #A world holds a cell grid per type, each type gets their own world grid for that type
 def create_world(num_types=tt.NUM_TYPES, rows=config.ROWS , columns=config.COLUMNS):
@@ -30,12 +37,12 @@ def create_world(num_types=tt.NUM_TYPES, rows=config.ROWS , columns=config.COLUM
 
 def add_bundle(world, label, cells, q, amount):
     # give each listed cell to bundle `label`,
-    # put `amount` of type q into it as bundled material.
+    # put `amount` of type q into it as bundled amounts.
 
     #cells input represent coordinate points (i,j) and the input will take a list of whatever cell coordinates you want the bundle to occupy
     for i,j in cells:
         world["owner"][j,i] = label #this bundle now owns the cell
-        world["bundled"][q, j, i] += amount #add the bundle's material there   
+        world["bundled"][q, j, i] += amount #add the bundle's amount there   
             
 
 def binding(world, q):
@@ -216,10 +223,351 @@ def cleanup(world):
 
     return {"free":world["free"], "bundled":world["bundled"], "owner": new_owner}
 
+#connection between two neighboring cells of a bundle (Definition 6)
+#this is the link in both directions added together: how well the stuff in one cell fits the stuff in the other
+def connection(bundled, j, i, nj, ni):
+    gx = bundled[:, j, i] #all the bundled amounts of every type at the first cell
+    gy = bundled[:, nj, ni] #all the bundled amounts of every type at the second cell
 
-                      
+    #gx @ FIT @ gy does the double sum: every amount at x times every fit times every amount at y
+    #first term is the link from x to y, second term is the link from y to x
+    return gx @ tt.FIT @ gy + gy @ tt.FIT @ gx
 
 
+#splits a bundle into separate bundles if its cells are no longer attached to each other (Definition V.3)
+def split(world):
+    bundled = world["bundled"]
+    owner = world["owner"]
+    new_owner = owner.copy()
+    rows, columns = owner.shape
+
+    #keeps track of which cells we already put into a group
+    visited = np.zeros((rows, columns), dtype=bool)
+
+    #new bundles need a label nobody is using yet, so start one past the biggest label there is
+    next_label = owner.max() + 1
+
+    #labels that already have a group, so the first group keeps the original label and any extra group gets a new one
+    labels_used = []
+
+    #go to every owned cell we haven't grouped yet
+    for j in range (0, rows, 1):
+        for i in range (0, columns, 1):
+            if (owner[j,i] != NO_OWNER and not visited[j,i]):
+                bundle_owner = owner[j,i] #the bundle this cell belongs to
+
+                #flood fill: start at this cell and keep stepping to attached neighbors until there are none left
+                group = [] #every cell in this group
+                to_visit = [(i, j)] #cells we still need to look at
+                visited[j,i] = True
+
+                while len(to_visit) > 0:
+                    ci, cj = to_visit.pop() #take a cell off the list
+                    group.append((ci, cj))
+
+                    #look at its four neighbors
+                    for di, dj in NEIGHBOR_STEPS:
+                        ni = ci + di
+                        nj = cj + dj
+
+                        #only continue if that neighbor actually exists on the grid
+                        if (ni >= 0 and ni < columns) and (nj >= 0 and nj < rows):
+                            #the neighbor has to be the same bundle and not already in a group
+                            if (owner[nj,ni] == bundle_owner and not visited[nj,ni]):
+                                #only attached if the connection is strong enough
+                                if connection(bundled, cj, ci, nj, ni) >= config.BOND_THRESHOLD:
+                                    visited[nj,ni] = True
+                                    to_visit.append((ni, nj))
+
+                #the first group of a bundle keeps its label, any group after that becomes its own new bundle
+                if bundle_owner in labels_used:
+                    for gi, gj in group:
+                        new_owner[gj,gi] = next_label
+                    next_label += 1
+                else:
+                    labels_used.append(bundle_owner)
+
+    return {"free": world["free"], "bundled": world["bundled"], "owner": new_owner}
+
+
+#dissolves a bundle if its total bond strength is below the threshold (Definition V.4)
+def dissolve(world):
+    bundled = world["bundled"]
+    owner = world["owner"]
+    new_free = world["free"].copy()
+    new_bundled = world["bundled"].copy()
+    new_owner = owner.copy()
+    rows, columns = owner.shape
+
+    #bond strength of every bundle, stored by label (a dictionary: bond[label] = that bundle's bond strength)
+    bond = {}
+
+    #add up the bond strength of every bundle (Definition 6)
+    for j in range (0, rows, 1):
+        for i in range (0, columns, 1):
+            if (owner[j,i] != NO_OWNER):
+                bundle_owner = owner[j,i]
+                gx = bundled[:, j, i]
+
+                #start this bundle at zero the first time we see it
+                if bundle_owner not in bond:
+                    bond[bundle_owner] = 0
+
+                #cohesion: how well the stuff in this cell holds itself together
+                bond[bundle_owner] += gx @ tt.FIT @ gx
+
+                #links: how well this cell fits each neighboring cell of the same bundle
+                for di, dj in NEIGHBOR_STEPS:
+                    ni = i + di
+                    nj = j + dj
+                    if (ni >= 0 and ni < columns) and (nj >= 0 and nj < rows):
+                        if (owner[nj,ni] == bundle_owner):
+                            gy = bundled[:, nj, ni]
+                            bond[bundle_owner] += gx @ tt.FIT @ gy #only one direction, the neighbor adds the other direction when we get to it
+
+    #now dissolve every bundle that is too weak
+    for j in range (0, rows, 1):
+        for i in range (0, columns, 1):
+            if (owner[j,i] != NO_OWNER):
+                bundle_owner = owner[j,i]
+                if bond[bundle_owner] < config.BOND_THRESHOLD:
+                    #everything in this cell becomes free and the cell isn't owned anymore
+                    new_free[:, j, i] += bundled[:, j, i]
+                    new_bundled[:, j, i] = 0
+                    new_owner[j,i] = NO_OWNER
+
+    return {"free": new_free, "bundled": new_bundled, "owner": new_owner}
+
+#lists every cell a bundle owns, as (column, row) pairs
+def bundle_cells(owner, b):
+    rows, columns = owner.shape
+    cells = []
+    for j in range (0, rows, 1):
+        for i in range (0, columns, 1):
+            if (owner[j,i] == b):
+                cells.append((i, j))
+    return cells
+
+
+#checks if a bundle has at least one drive (Definition 8): a type with a nonzero valence and some amount in the bundle
+def has_drive(bundled, cells):
+    types = bundled.shape[0]
+    for i, j in cells:
+        for q in range (1, types, 1):
+            if (tt.VALENCES[q] != 0 and bundled[q,j,i] > 0):
+                return True
+    return False
+
+
+#response of every type to one cell, leaving out bundle b's own amounts (Definition 5)
+#gives back a list: R[q] = how much of what q's lock fits is in that cell, not counting b itself
+def response_excluding(world, b, nj, ni):
+    #total amount of every type in that cell
+    amounts_here = world["free"][:, nj, ni] + world["bundled"][:, nj, ni]
+
+    #if bundle b owns that cell, take its own amounts back out so it isn't attracted to itself
+    if (world["owner"][nj,ni] == b):
+        amounts_here = amounts_here - world["bundled"][:, nj, ni]
+
+    #amounts_here @ FIT does the sum over r of amount of r * how well r's key fits q's lock, for every q at once
+    return amounts_here @ tt.FIT
+
+
+#checks that every cell of the bundle would still be on the grid after moving by (di, dj)
+def is_valid(cells, di, dj, rows, columns):
+    for i, j in cells:
+        ni = i + di
+        nj = j + dj
+        if not ((ni >= 0 and ni < columns) and (nj >= 0 and nj < rows)):
+            return False
+    return True
+
+
+#desirability of moving bundle b by (di, dj) (Definition VI.1)
+#for every cell of the bundle: each drive's amount * its valence * its response to the cell it would move into
+def desirability(world, b, cells, di, dj):
+    U = 0
+    for i, j in cells:
+        ni = i + di
+        nj = j + dj
+
+        g = world["bundled"][:, j, i] #every bundled amount at this cell of the bundle
+        R = response_excluding(world, b, nj, ni) #every type's response to the cell it would move into
+
+        #(g * VALENCES) is each type's amount times its pull, then @ R adds up pull * response over every type
+        #types with valence 0 contribute nothing, so only drives count
+        U += (g * tt.VALENCES) @ R
+    return U
+
+
+#reactions across facing pairs when a move is blocked (forms R4 and R5)
+#facing is a list of (i, j, ni, nj): a cell of the pushing bundle and the cell of the other bundle in front of it
+def contact(world, facing):
+    bundled = world["bundled"]
+    new_bundled = bundled.copy()
+    types = bundled.shape[0]
+
+    for i, j, ni, nj in facing:
+        gx = bundled[:, j, i] #pusher's amounts
+        gy = bundled[:, nj, ni] #other bundle's amounts
+
+        #raw amounts in both directions
+        #raw_xy[q,r]: pusher's q (key side) with the other's r (lock side)   (R4)
+        #raw_yx[q,r]: the other's q (key side) with the pusher's r (lock side) (R5)
+        raw_xy = np.zeros((types, types))
+        raw_yx = np.zeros((types, types))
+        for q in range (0, types, 1):
+            for r in range (0, types, 1):
+                raw_xy[q,r] = config.REACTION_RATE * gx[q] * gy[r] * (tt.FIT[q,r] + tt.CLASH[q,r])
+                raw_yx[q,r] = config.REACTION_RATE * gy[q] * gx[r] * (tt.FIT[q,r] + tt.CLASH[q,r])
+
+        #demand on every type in each of the two cells, same idea as in reactions
+        demand_x = np.zeros(types)
+        demand_y = np.zeros(types)
+        for q in range (0, types, 1):
+            for r in range (0, types, 1):
+                demand_x[q] += raw_xy[q,r] #the first amount is always used up
+                demand_y[q] += raw_yx[q,r]
+                if (tt.CLASH[q,r] > 0): #in erosion, the second amount is used up too
+                    demand_y[r] += raw_xy[q,r]
+                    demand_x[r] += raw_yx[q,r]
+
+        #factors: scale down if there isn't enough to go around
+        factor_x = np.ones(types)
+        factor_y = np.ones(types)
+        for t in range (0, types, 1):
+            if (demand_x[t] > 0):
+                factor_x[t] = min(1, gx[t] / demand_x[t])
+            if (demand_y[t] > 0):
+                factor_y[t] = min(1, gy[t] / demand_y[t])
+
+        #apply both directions
+        new_x = gx.copy()
+        new_y = gy.copy()
+        for q in range (0, types, 1):
+            for r in range (0, types, 1):
+                is_clash = tt.CLASH[q,r] > 0
+                product = tt.PRODUCTS[r]
+
+                #pusher's q acting on the other's r (R4): product goes into the other bundle
+                scale = factor_x[q]
+                if is_clash:
+                    scale = min(scale, factor_y[r])
+                rho = raw_xy[q,r] * scale
+                new_x[q] -= rho
+                if is_clash:
+                    new_y[r] -= rho
+                if product != tt.NONE:
+                    new_y[product] += rho
+
+                #the other's q acting on the pusher's r (R5): product goes into the pusher
+                scale = factor_y[q]
+                if is_clash:
+                    scale = min(scale, factor_x[r])
+                rho = raw_yx[q,r] * scale
+                new_y[q] -= rho
+                if is_clash:
+                    new_x[r] -= rho
+                if product != tt.NONE:
+                    new_x[product] += rho
+
+        new_bundled[:, j, i] = new_x
+        new_bundled[:, nj, ni] = new_y
+
+    return {"free": world["free"], "bundled": new_bundled, "owner": world["owner"]}
+
+
+#moves a bundle by (di, dj): every one of its amounts shifts one cell, free amounts stay where they are
+def translate(world, b, cells, di, dj):
+    new_bundled = world["bundled"].copy()
+    new_owner = world["owner"].copy()
+
+    #copy the bundle's amounts out first, since old and new cells can overlap
+    saved = []
+    for i, j in cells:
+        saved.append(world["bundled"][:, j, i].copy())
+
+    #clear the old cells
+    for i, j in cells:
+        new_bundled[:, j, i] = 0
+        new_owner[j,i] = NO_OWNER
+
+    #write the amounts into the new cells
+    for k in range (0, len(cells), 1):
+        i, j = cells[k]
+        ni = i + di
+        nj = j + dj
+        new_bundled[:, nj, ni] = saved[k]
+        new_owner[nj,ni] = b
+
+    return {"free": world["free"], "bundled": new_bundled, "owner": new_owner}
+
+
+#motion (Definition VI.1): bundles with drives move one at a time in a random order
+def motion(world):
+    rows, columns = world["owner"].shape
+
+    #every bundle label in the world (np.unique lists each label once), leaving out NO_OWNER
+    labels = []
+    for b in np.unique(world["owner"]):
+        if (b != NO_OWNER):
+            labels.append(b)
+
+    #random order, so no bundle always goes first
+    rng.shuffle(labels)
+
+    for b in labels:
+        #bundles can change while others move, so look at this one's cells now
+        cells = bundle_cells(world["owner"], b)
+        if (len(cells) == 0 or not has_drive(world["bundled"], cells)):
+            continue #skip bundles that are gone or have no drive
+
+        #score every valid displacement
+        options = []
+        scores = []
+        for di, dj in DISPLACEMENTS:
+            if is_valid(cells, di, dj, rows, columns):
+                options.append((di, dj))
+                scores.append(desirability(world, b, cells, di, dj))
+
+        #pick the best one, breaking ties at random
+        best = max(scores)
+        best_options = []
+        for k in range (0, len(options), 1):
+            if (scores[k] == best):
+                best_options.append(options[k])
+        di, dj = best_options[rng.integers(len(best_options))]
+
+        #stay: nothing happens
+        if (di == 0 and dj == 0):
+            continue
+
+        #look for facing pairs: cells of the bundle that would move into a cell owned by another bundle
+        facing = []
+        for i, j in cells:
+            ni = i + di
+            nj = j + dj
+            other = world["owner"][nj,ni]
+            if (other != NO_OWNER and other != b):
+                facing.append((i, j, ni, nj))
+
+        if (len(facing) > 0):
+            world = contact(world, facing) #blocked: stay put, and react across the boundary
+        else:
+            world = translate(world, b, cells, di, dj) #way is clear: move
+
+    return world
+
+
+#one tick of the world, in the order from Part II
 def tick(world):
-    return cleanup(release(reactions(flow(world))))
+    world = flow(world) #free stuff spreads
+    world = reactions(world) #stuff reacts
+    world = release(world) #bundles drop what they don't hold
+    world = cleanup(world) #empty cells stop belonging to bundles
+    world = split(world) #bundles that came apart become separate bundles
+    world = dissolve(world) #bundles too weak to hold together fall apart
+    world = motion(world) #bundles with drives move or push
+    return world
+
 
