@@ -7,12 +7,12 @@ MAX_DISPLAY_VALUE = 10
 FPS = 60
 
 #Type table
-DIM = 2
+DIM = 3
 DEAD_ZONE = 0.1
 
 #For flow rate (D) 
 HOP_RATE = 0.4
-DISPLAY_TYPE = 2 #index of type that the window shows (1 = e)
+DISPLAY_TYPE = 0 #index of type that the window shows (1 = e)
 
 BINDING_SENSITIVITY = 1
 

@@ -14,24 +14,25 @@ screen = pg.display.set_mode(size=(width, height))
 font = render.create_font()
 
 
-#builds the tiny world: a source of s in the middle, and a seeker a few cells east of it
+#builds a world with one source of s in the middle and four seekers around it
 def setup_world():
     state = world.create_world()
 
     middle = (config.COLUMNS // 2, config.ROWS // 2) #(column, row)
-    seeker_start = (config.COLUMNS // 2 + 8, config.ROWS // 2 + 3) #8 columns east and 3 rows north of the source
 
-    #bundle 0: the source, made of e (at least 2 units so it doesn't dissolve from rounding at the threshold)
+    #bundle 0: the source, made of e
     world.add_bundle(state, 0, [middle], 1, 10.0)
 
-    #bundle 1: the seeker, made of g
-    world.add_bundle(state, 1, [seeker_start], 3, 3.0)
+    #bundles 1 to 4: seekers made of g, scattered around the source
+    seeker_starts = [(5, 3), (34, 4), (8, 16), (31, 15)]
+    for k in range(0, len(seeker_starts), 1):
+        world.add_bundle(state, k + 1, [seeker_starts[k]], 3, 3.0)
 
     return state
 
 
 state = setup_world()
-display_type = config.DISPLAY_TYPE #which type the window shows, can be changed with the number keys
+display_type = config.DISPLAY_TYPE #0 shows everything, 1-3 show one type, can be changed with the number keys
 tick_count = 0
 
 clock = pg.time.Clock()
@@ -61,7 +62,7 @@ while running:
                 state = setup_world()
                 tick_count = 0
 
-            #number keys pick which type is shown (0 = ambient, 1 = e, 2 = s, 3 = g)
+            #number keys pick what is shown (0 = everything, 1 = e, 2 = s, 3 = g)
             elif pg.K_0 <= event.key <= pg.K_9:
                 chosen = event.key - pg.K_0
                 if chosen < tt.NUM_TYPES:
@@ -77,12 +78,16 @@ while running:
 
     # 3. Draw the frame
     screen.fill((0, 0, 0))
-    total = state["free"][display_type] + state["bundled"][display_type] #free plus bundled amount of the shown type
-    render.draw(screen, total, font)
+    if display_type == 0:
+        render.draw_world(screen, state, font) #every type at once
+    else:
+        total = state["free"][display_type] + state["bundled"][display_type] #free plus bundled amount of one type
+        render.draw(screen, total, font)
     pg.display.flip()
 
-    #window title shows which type is being drawn and the current tick
-    pg.display.set_caption(f"Showing: {tt.NAMES[display_type]}   tick {tick_count}" + ("   (paused)" if paused else ""))
+    #window title shows what is being drawn and the current tick
+    shown = "everything" if display_type == 0 else tt.NAMES[display_type]
+    pg.display.set_caption(f"Showing: {shown}   tick {tick_count}" + ("   (paused)" if paused else ""))
 
     # 4. Wait to hold the frame rate, and bank the elapsed time
     dt = clock.tick(config.FPS)
