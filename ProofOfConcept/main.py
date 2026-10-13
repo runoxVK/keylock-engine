@@ -3,6 +3,7 @@ import config
 import render
 import world
 import type_table as tt
+import checks
 
 pg.init()
 
@@ -52,6 +53,7 @@ while running:
 
             elif (event.key == pg.K_RIGHT) and paused:
                 state = world.tick(state)
+                checks.check_world(state) #stop right away if anything impossible happened
                 tick_count += 1
 
             #R restarts the world from the beginning
@@ -69,6 +71,7 @@ while running:
     if not paused:
         while time_bank >= tick_interval:
             state = world.tick(state)
+            checks.check_world(state) #stop right away if anything impossible happened
             tick_count += 1
             time_bank -= tick_interval
 
