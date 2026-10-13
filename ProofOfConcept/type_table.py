@@ -38,12 +38,20 @@ VALENCES = np.array([
     1,      # g - pulls toward cells containing what its lock fits
 ], dtype=int)
 
-#what each type looks like on screen (display only, the laws never see these)
+#what bundled amounts of each type look like on screen (display only, the laws never see these)
 GLYPHS = [
     " ",   # ambient - never drawn
     "*",   # e - the source
     "~",   # s - the trail
     "@",   # g - the seeker
+]
+
+#what free amounts of each type look like (bundled amounts use GLYPHS)
+FREE_GLYPHS = [
+    " ",   # ambient - never drawn
+    ".",   # e - loose e
+    "~",   # s - the trail
+    ",",   # g - loose g, like the remains of a seeker
 ]
 
 #color of each type as (red, green, blue)
@@ -75,8 +83,9 @@ assert LOCKS.shape == (NUM_TYPES, config.DIM), "LOCKS must have one row of DIM n
 assert PRODUCTS.shape == (NUM_TYPES,), "PRODUCTS must have one entry per type"
 assert VALENCES.shape == (NUM_TYPES,), "VALENCES must have one entry per type"
 
-# One glyph and one color per type.
+# One glyph, one free glyph, and one color per type.
 assert len(GLYPHS) == NUM_TYPES, "GLYPHS must have one entry per type"
+assert len(FREE_GLYPHS) == NUM_TYPES, "FREE_GLYPHS must have one entry per type"
 assert len(COLORS) == NUM_TYPES, "COLORS must have one entry per type"
 
 # No type produces the ambient (Axiom S4).

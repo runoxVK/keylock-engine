@@ -67,5 +67,10 @@ def draw_world(screen, world_state, font):
             r, g, b = tt.COLORS[t]
             color = (int(r * brightness), int(g * brightness), int(b * brightness))
 
-            glyph = font.render(tt.GLYPHS[t], True, color)
+            #bundled amounts use GLYPHS, free amounts use FREE_GLYPHS so you can tell them apart
+            if full_brightness:
+                symbol = tt.GLYPHS[t]
+            else:
+                symbol = tt.FREE_GLYPHS[t]
+            glyph = font.render(symbol, True, color)
             screen.blit(glyph, (x, y))
